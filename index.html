@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beatling Prima</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #2a2a3a;
+      --accent: #7c6aff;
+      --accent2: #ff6a9a;
+      --text: #e8e8f0;
+      --text-dim: #6a6a8a;
+      --green: #4affb4;
+      --red: #ff4a6a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s;
+    }
+    .dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot.playing { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Video / Canvas area */
+    .stage {
+      position: relative;
+      flex: 1;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      opacity: 0.7;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      transform: scaleX(-1);
+    }
+
+    .pitch-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.5;
+      transition: top 0.05s ease;
+      pointer-events: none;
+    }
+
+    .overlay-info {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      line-height: 1.8;
+    }
+
+    .note-display {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Space Mono', monospace;
+      font-size: 72px;
+      font-weight: 700;
+      color: var(--accent);
+      opacity: 0;
+      transition: opacity 0.1s;
+      text-shadow: 0 0 40px var(--accent);
+      pointer-events: none;
+    }
+    .note-display.visible { opacity: 1; }
+
+    /* Control Panel */
+    .panel {
+      width: 280px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 20px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .control-group { display: flex; flex-direction: column; gap: 8px; }
+
+    select, button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    select:hover, button:hover {
+      border-color: var(--accent);
+    }
+
+    select:focus { outline: none; border-color: var(--accent); }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 500;
+    }
+    button.primary:hover { opacity: 0.85; }
+
+    button.danger {
+      background: var(--red);
+      border-color: var(--red);
+      color: #fff;
+      font-weight: 500;
+    }
+
+    button.record-btn {
+      background: var(--bg);
+      border: 2px solid var(--red);
+      color: var(--red);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    button.record-btn.recording {
+      background: var(--red);
+      color: #fff;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .rec-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Vector display */
+    .vector-display {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .vector-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .vector-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      width: 32px;
+      flex-shrink: 0;
+    }
+
+    .vector-bar-bg {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .vector-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.05s ease;
+      width: 0%;
+    }
+
+    .vector-val {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      width: 32px;
+      text-align: right;
+    }
+
+    /* Recording list */
+    .rec-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .rec-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .rec-item-name {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .rec-item-btn {
+      background: none;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 4px 10px;
+      font-size: 11px;
+      width: auto;
+    }
+
+    /* Prima+ upgrade */
+    .upgrade-box {
+      background: linear-gradient(135deg, rgba(124,106,255,0.1), rgba(255,106,154,0.1));
+      border: 1px solid rgba(124,106,255,0.3);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .upgrade-box p {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    .upgrade-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      color: #fff;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    /* Start screen */
+    #start-screen {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      z-index: 10;
+    }
+
+    #start-screen h1 {
+      font-family: 'Space Mono', monospace;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 4px;
+    }
+
+    #start-screen h1 span { color: var(--accent); }
+
+    #start-screen p {
+      color: var(--text-dim);
+      font-size: 16px;
+      text-align: center;
+      max-width: 400px;
+      line-height: 1.6;
+    }
+
+    #start-btn {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      padding: 16px 48px;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 50px;
+      width: auto;
+      letter-spacing: 1px;
+    }
+
+    #start-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(124,106,255,0.4);
+    }
+
+    .hint {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    /* Gesture indicator */
+    .gesture-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(124,106,255,0.2);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .gesture-badge.visible { opacity: 1; }
+
+    /* Timer */
+    .rec-timer {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      color: var(--red);
+      text-align: center;
+      display: none;
+    }
+    .rec-timer.active { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">BEATLING <span>PRIMA</span></div>
+  <div class="status-bar">
+    <div class="dot" id="cam-dot"></div>
+    <span id="status-text">CAMERA OFF</span>
+  </div>
+</header>
+
+<div class="main">
+  <div class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="pitch-line" id="pitch-line"></div>
+    <div class="note-display" id="note-display">C4</div>
+    <div class="gesture-badge" id="gesture-badge">PINCH</div>
+    <div class="overlay-info" id="overlay-info"></div>
+
+    <div id="start-screen">
+      <h1>BEATLING <span>PRIMA</span></h1>
+      <p>Your body is the instrument.<br>No music knowledge required.</p>
+      <button id="start-btn" onclick="startCamera()">START PLAYING</button>
+      <div class="hint">WEBCAM REQUIRED · WORKS IN BROWSER</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <!-- Scale / Key -->
+    <div class="control-group">
+      <div class="section-title">Scale</div>
+      <select id="scale-select">
+        <option value="pentatonic_major">Pentatonic Major</option>
+        <option value="pentatonic_minor">Pentatonic Minor</option>
+        <option value="major">Major</option>
+        <option value="minor">Minor</option>
+        <option value="blues">Blues</option>
+      </select>
+      <select id="key-select">
+        <option value="C">Key: C</option>
+        <option value="D">Key: D</option>
+        <option value="E">Key: E</option>
+        <option value="F">Key: F</option>
+        <option value="G">Key: G</option>
+        <option value="A">Key: A</option>
+        <option value="B">Key: B</option>
+      </select>
+    </div>
+
+    <!-- Instrument -->
+    <div class="control-group">
+      <div class="section-title">Sound</div>
+      <select id="instrument-select">
+        <option value="marimba">Marimba</option>
+        <option value="sine">Sine Wave</option>
+        <option value="bell">Bell</option>
+        <option value="pluck">Pluck</option>
+      </select>
+    </div>
+
+    <!-- State Vector -->
+    <div class="control-group">
+      <div class="section-title">State Vector</div>
+      <div class="vector-display" id="vector-display">
+        <div class="vector-row">
+          <div class="vector-label">D1</div>
+          <div class="vector-bar-bg"><div class="vector-bar" id="bar-d1"></div></div>
+          <div class="vector-val" id="val-d1">0.00</div>
+        </div>
+        <div class="vector-row">
+          <div class="vector-label">D2</div>
+          <div class="vector-bar-bg"><div class="vector-bar" id="bar-d2" style="background:var(--accent2)"></div></div>
+          <div class="vector-val" id="val-d2">0.00</div>
+        </div>
+        <div class="vector-row">
+          <div class="vector-label">D3</div>
+          <div class="vector-bar-bg"><div class="vector-bar" id="bar-d3" style="background:var(--green)"></div></div>
+          <div class="vector-val" id="val-d3">0.00</div>
+        </div>
+        <div class="vector-row">
+          <div class="vector-label">D7</div>
+          <div class="vector-bar-bg"><div class="vector-bar" id="bar-d7" style="background:#ffb84a"></div></div>
+          <div class="vector-val" id="val-d7">0.00</div>
+        </div>
+        <div class="vector-row">
+          <div class="vector-label">D9</div>
+          <div class="vector-bar-bg"><div class="vector-bar" id="bar-d9"></div></div>
+          <div class="vector-val" id="val-d9">0.00</div>
+        </div>
+        <div class="vector-row">
+          <div class="vector-label">D10</div>
+          <div class="vector-bar-bg"><div class="vector-bar" id="bar-d10" style="background:var(--accent2)"></div></div>
+          <div class="vector-val" id="val-d10">0.00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recording -->
+    <div class="control-group">
+      <div class="section-title">Recording</div>
+      <button class="record-btn" id="rec-btn" onclick="toggleRecord()">
+        <div class="rec-dot"></div>
+        <span id="rec-label">REC</span>
+      </button>
+      <div class="rec-timer" id="rec-timer">● 00:00</div>
+      <div class="rec-list" id="rec-list"></div>
+    </div>
+
+    <!-- Prima+ -->
+    <div class="upgrade-box">
+      <p>Save recordings, export MIDI & audio with <strong>Prima+</strong></p>
+      <button class="upgrade-btn" onclick="showUpgrade()">Upgrade to Prima+ →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MediaPipe CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script src="capture.js"></script>
+<script src="audio.js"></script>
+<script src="engine.js"></script>
+
+</body>
+</html>
