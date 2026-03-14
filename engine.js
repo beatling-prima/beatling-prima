@@ -21,11 +21,13 @@ function onStateVector(state) {
   const key = document.getElementById('key-select')?.value || 'C';
   const instrument = document.getElementById('instrument-select')?.value || 'marimba';
 
-  const hasRightHand = state.rightHand !== null;
+  const hasRightHand = state.rightHand !== null && state.D1 > 0;
 
   if (hasRightHand) {
-    const velocity = state.D3 > 0.05 ? state.D3 : 0.6;
-    Audio.noteOn(state.D1, velocity, state.D10, scale, key, instrument);
+    const velocity = 0.6;
+    const d1 = isNaN(state.D1) ? 0.5 : state.D1;
+    const d10 = isNaN(state.D10) ? 0.5 : state.D10;
+    Audio.noteOn(d1, velocity, d10, scale, key, instrument);
   } else {
     Audio.noteOff();
   }

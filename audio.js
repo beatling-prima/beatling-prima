@@ -34,20 +34,16 @@ const Audio = (() => {
   function d1ToMidi(d1, scaleName, keyName) {
     const scale = SCALES[scaleName] || SCALES.pentatonic_major;
     const keyOffset = KEY_OFFSETS[keyName] || 0;
-
-    // D1を音域に展開（C3〜C6: MIDI 48〜84, 2オクターブ）
-    const totalSteps = scale.length * 2; // 2オクターブ
-    const step = Math.floor(d1 * totalSteps);
+    const safeD1 = isNaN(d1) || d1 === null ? 0.5 : Math.max(0, Math.min(1, d1));
+    const totalSteps = scale.length * 2;
+    const step = Math.floor(safeD1 * totalSteps);
     const clampedStep = Math.min(step, totalSteps - 1);
-
     const octave = Math.floor(clampedStep / scale.length);
     const scaleIndex = clampedStep % scale.length;
     const semitone = scale[scaleIndex] + keyOffset;
-
     const midi = 48 + octave * 12 + semitone;
     return Math.min(84, Math.max(36, midi));
   }
-
   // 音色別エンベロープ設定
   const INSTRUMENTS = {
     marimba: { attack: 0.005, decay: 0.3, sustain: 0.1, release: 0.5, type: 'sine', harmonics: [1, 0.5, 0.25] },
